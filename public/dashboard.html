@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Dashboard</h1>
+  <nav>
+    <a href="index.html">Home</a>
+    <button id="logoutBtn" style="margin-top:0;">Logout</button>
+  </nav>
+
+  <div id="content"></div>
+
+  <script>
+    const content = document.getElementById('content');
+
+    async function load() {
+      const res = await fetch('/api/session');
+      if (!res.ok) {
+        window.location.href = 'login.html';
+        return;
+      }
+      const data = await res.json();
+      render(data);
+    }
+
+    function render(data) {
+      let html = `<h2>Welcome, ${data.username}</h2>`;
+      html += `<div class="kv"><span class="label">Method used:</span> ${data.method}</div>`;
+      html += `<div class="kv"><span class="label">Stored hash:</span> ${data.hash}</div>`;
+      html += `<div class="kv"><span class="label">Stored salt:</span> ${data.salt || '(none - plain method)'}</div>`;
+      html += `<div class="kv"><span class="label">Account created:</span> ${data.createdAt}</div>`;
+
+      if (data.method === 'plain') {
+        html += `<p>The password was hashed on its own:
+          <br><code>hash(password)</code><br>
+          Anyone with the database, or a rainbow table, could look up this hash directly.</p>`;
+      } else if (data.method === 'salted') {
+        html += `<p>The password was combined with the stored salt before hashing:
+          <br><code>hash(password + salt)</code><br>
+          The salt is stored in plaintext next to the hash,
+          which defeats precomputed rainbow tables but not a targeted attack once the salt is known.</p>`;
+      } else if (data.method === 'salted_peppered') {
+        html += `<p>The password was combined with the stored salt and a secret pepper before hashing:
+          <br><code>hash(password + salt + pepper)</code><br>
+          The pepper is never
+          stored, so on this login the server had to try every possible pepper value against the
+          stored hash until one matched:</p>`;
+
+        if (data.lastLogin && data.lastLogin.attempts) {
+          html += renderAttempts(data.lastLogin.attempts, data.lastLogin.pepperFound);
+        } else {
+          html += `<p><em>No brute-force log available for this session
+            (this appears only right after you log in).</em></p>`;
+        }
+      }
+
+      content.innerHTML = html;
+    }
+
+    function renderAttempts(attempts, pepperFound) {
+      let html = `<table><tr><th>#</th><th>Candidate pepper</th><th>Computed hash</th><th>Match?</th></tr>`;
+      attempts.forEach((a, i) => {
+        html += `<tr class="${a.match ? 'match' : ''}">
+          <td>${i + 1}</td>
+          <td>${a.pepper}</td>
+          <td>${a.hash}</td>
+          <td>${a.match ? 'YES' : 'no'}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+      html += `<p>Pepper found: <strong>${pepperFound}</strong>
+        (took ${attempts.length} attempt${attempts.length === 1 ? '' : 's'}).
+        This value is not stored - it will need to be rediscovered the same way on every login.</p>`;
+      return html;
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = 'login.html';
+    });
+
+    load();
+  </script>
+</body>
+</html>

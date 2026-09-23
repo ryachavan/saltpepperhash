@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Register</h1>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="login.html">Login</a>
+  </nav>
+
+  <form id="registerForm">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+
+    <fieldset>
+      <legend>Hashing method</legend>
+      <label><input type="radio" name="method" value="plain" checked> Plain (unsalted) hashing</label>
+      <label><input type="radio" name="method" value="salted"> Salted hashing</label>
+      <label><input type="radio" name="method" value="salted_peppered"> Salted + peppered hashing</label>
+    </fieldset>
+
+    <button type="submit">Register</button>
+  </form>
+
+  <div id="errorBox" class="error" style="display:none;"></div>
+  <div id="resultBox" style="display:none;">
+    <h2>Registration result</h2>
+    <div class="note" id="resultContent"></div>
+    <p><a href="login.html">Go to login</a></p>
+  </div>
+
+  <script>
+    const form = document.getElementById('registerForm');
+    const errorBox = document.getElementById('errorBox');
+    const resultBox = document.getElementById('resultBox');
+    const resultContent = document.getElementById('resultContent');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+      resultBox.style.display = 'none';
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const method = form.querySelector('input[name="method"]:checked').value;
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, method })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorBox.textContent = data.error || 'Registration failed.';
+          errorBox.style.display = 'block';
+          return;
+        }
+
+        let html = `<div class="kv"><span class="label">Method:</span> ${data.method}</div>`;
+        html += `<div class="kv"><span class="label">Stored hash:</span> ${data.hash}</div>`;
+        html += `<div class="kv"><span class="label">Stored salt:</span> ${data.salt || '(none)'}</div>`;
+        if (data.pepperNote) {
+          html += `<div class="kv" style="margin-top:8px;">${data.pepperNote}</div>`;
+        }
+        resultContent.innerHTML = html;
+        resultBox.style.display = 'block';
+        form.reset();
+      } catch (err) {
+        errorBox.textContent = 'Network error - is the server running?';
+        errorBox.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
